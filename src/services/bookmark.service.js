@@ -1,13 +1,20 @@
 import { supabase } from "@/lib/supabase";
 
 /**
- * Fetch all bookmarks for the current user.
- * RLS ensures only the owner's rows are returned.
+ * Fetch all bookmarks for the current authenticated user only.
+ * Explicitly filters by user_id to prevent showing other users' public bookmarks.
  */
-export async function getBookmarks() {
+export async function getMyBookmarks() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Not authenticated");
+
   const { data, error } = await supabase
     .from("bookmarks")
     .select("*")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) throw error;

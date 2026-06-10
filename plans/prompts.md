@@ -283,5 +283,48 @@ A chronological record of all prompts used to build this application. Each entry
 
 ---
 
+## Prompt 8 — Bookmark Visibility Bug Fix
+
+**Date:** 2026-06-10  
+**Phase:** Security and query scoping
+
+**Prompt:**
+
+> BUG FIX ONLY
+> 
+> Do NOT rebuild the application.
+> Do NOT create new pages.
+> Do NOT change UI.
+> 
+> Analyze the existing codebase and fix the bookmark visibility/security issue.
+> 
+> Current bug:
+> User A: 3 bookmarks (2 public, 1 private).
+> User B logs in. Dashboard incorrectly shows User A's public bookmarks.
+> 
+> Expected behavior:
+> Dashboard must ONLY show bookmarks owned by the currently authenticated user.
+> 
+> RLS Requirements:
+> Owner should be able to SELECT/INSERT/UPDATE/DELETE own bookmarks using `auth.uid() = user_id`.
+> Public visitors should only be able to read bookmarks where `is_public = true`.
+> 
+> Service Layer Requirements:
+> Dashboard service: must fetch bookmarks by current authenticated user id.
+> Public profile service: must fetch bookmarks by profile id AND is_public = true.
+> Separate methods if needed (e.g. getMyBookmarks()).
+
+**What was produced:**
+
+- `src/services/bookmark.service.js` — Renamed `getBookmarks()` to `getMyBookmarks()`, added dynamic retrieval of the authenticated user's ID using `supabase.auth.getUser()`, and added an explicit `.eq("user_id", user.id)` filter to ensure only the owner's bookmarks are fetched.
+- `src/app/dashboard/page.js` — Updated imports and function calls to use `getMyBookmarks()` instead of `getBookmarks()`.
+
+**Key decisions:**
+- Rather than modifying database RLS policies (which correctly allow anyone, including logged-in users, to read public bookmarks of other users when visiting their public profile page), the query scoping on the dashboard was fixed. By explicitly filtering dashboard queries by the authenticated user's ID, we ensure other users' public bookmarks are not returned in the dashboard.
+- Renamed the service function to `getMyBookmarks()` to distinguish it cleanly from public profile bookmark retrieval services.
+
+---
+
 *— End of log. Append new prompts below as development continues. —*
+
 

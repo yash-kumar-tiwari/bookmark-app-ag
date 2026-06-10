@@ -8,7 +8,7 @@ import { bookmarkSchema } from "@/lib/schemas";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/services/auth.service";
 import {
-  getBookmarks,
+  getMyBookmarks,
   createBookmark,
   updateBookmark,
   deleteBookmark,
@@ -442,7 +442,7 @@ function DashboardContent() {
     try {
       setError(null);
       setLoading(true);
-      const data = await getBookmarks();
+      const data = await getMyBookmarks();
       setBookmarks(data);
     } catch (err) {
       console.error("Failed to load bookmarks:", err);
