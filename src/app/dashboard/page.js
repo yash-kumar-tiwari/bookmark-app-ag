@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { bookmarkSchema } from "@/lib/schemas";
-import { mockUser, mockBookmarks } from "@/lib/mock-data";
+import { mockBookmarks } from "@/lib/mock-data";
+import { useAuth } from "@/hooks/useAuth";
+import { signOut } from "@/services/auth.service";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -371,17 +375,24 @@ function BookmarkRow({ bookmark, onEdit, onDelete }) {
   );
 }
 
-// ── Dashboard Page ───────────────────────────────────────────────────────
-export default function DashboardPage() {
+// ── Dashboard Content ────────────────────────────────────────────────────
+function DashboardContent() {
+  const router = useRouter();
+  const { profile } = useAuth();
   const [bookmarks, setBookmarks] = useState(mockBookmarks);
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedBookmark, setSelectedBookmark] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const publicCount = bookmarks.filter((b) => b.is_public).length;
   const privateCount = bookmarks.filter((b) => !b.is_public).length;
+
+  // Use real profile data, fallback for safety
+  const handle = profile?.handle ?? "user";
+  const email = profile?.email ?? "";
 
   function handleAdd(data) {
     const newBookmark = {
@@ -404,13 +415,25 @@ export default function DashboardPage() {
 
   function handleCopyProfileLink() {
     navigator.clipboard
-      ?.writeText(`${window.location.origin}/${mockUser.handle}`)
+      ?.writeText(`${window.location.origin}/${handle}`)
       .then(() => {
         setCopied(true);
         toast.success("Profile link copied!");
         setTimeout(() => setCopied(false), 2000);
       })
       .catch(() => toast.error("Failed to copy"));
+  }
+
+  async function handleLogout() {
+    try {
+      setLoggingOut(true);
+      await signOut();
+      toast.success("Signed out");
+      router.replace("/login");
+    } catch (err) {
+      toast.error(err?.message || "Failed to sign out");
+      setLoggingOut(false);
+    }
   }
 
   return (
@@ -428,11 +451,16 @@ export default function DashboardPage() {
             </div>
             <span className="text-lg font-bold tracking-tight">Markly</span>
           </Link>
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" asChild>
-            <Link href="/login" id="dashboard-logout">
-              <LogOut className="size-3.5" />
-              Log out
-            </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            id="dashboard-logout"
+          >
+            <LogOut className="size-3.5" />
+            {loggingOut ? "Signing out…" : "Log out"}
           </Button>
         </div>
       </header>
@@ -445,11 +473,11 @@ export default function DashboardPage() {
               <CardContent className="flex flex-col items-center pt-2 text-center">
                 <Avatar size="lg" className="mb-3 size-16">
                   <AvatarFallback className="text-lg font-semibold bg-primary/10 text-primary">
-                    {mockUser.handle.slice(0, 2).toUpperCase()}
+                    {handle.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <h2 className="text-lg font-semibold">@{mockUser.handle}</h2>
-                <p className="text-sm text-muted-foreground">{mockUser.email}</p>
+                <h2 className="text-lg font-semibold">@{handle}</h2>
+                <p className="text-sm text-muted-foreground">{email}</p>
 
                 <Separator className="my-4" />
 
@@ -491,7 +519,7 @@ export default function DashboardPage() {
                   className="mt-2 w-full gap-2 text-muted-foreground"
                   asChild
                 >
-                  <Link href={`/${mockUser.handle}`} id="view-public-profile">
+                  <Link href={`/${handle}`} id="view-public-profile">
                     <ExternalLink className="size-3.5" />
                     View public profile
                   </Link>
@@ -589,5 +617,14 @@ export default function DashboardPage() {
         </>
       )}
     </div>
+  );
+}
+
+// ── Dashboard Page ───────────────────────────────────────────────────────
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
   );
 }

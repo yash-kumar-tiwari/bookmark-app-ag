@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema } from "@/lib/schemas";
+import { signIn } from "@/services/auth.service";
+import GuestRoute from "@/components/auth/GuestRoute";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,9 +20,12 @@ import {
 } from "@/components/ui/card";
 import { Bookmark, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
-export default function LoginPage() {
+function LoginForm() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   const {
     register,
@@ -33,8 +39,18 @@ export default function LoginPage() {
     },
   });
 
-  function onSubmit(data) {
-    console.log(data);
+  async function onSubmit(data) {
+    try {
+      setAuthError("");
+      console.log(data);
+      await signIn({ email: data.email, password: data.password });
+      toast.success("Signed in successfully");
+      router.replace("/dashboard");
+    } catch (err) {
+      const msg = err?.message || "Failed to sign in";
+      setAuthError(msg);
+      toast.error(msg);
+    }
   }
 
   return (
@@ -68,6 +84,13 @@ export default function LoginPage() {
 
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" id="login-form">
+              {/* Auth-level error */}
+              {authError && (
+                <div className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive" id="login-auth-error">
+                  {authError}
+                </div>
+              )}
+
               {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="login-email">Email</Label>
@@ -148,5 +171,13 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <GuestRoute>
+      <LoginForm />
+    </GuestRoute>
   );
 }

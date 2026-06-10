@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signupSchema } from "@/lib/schemas";
+import { signUp, checkHandleExists } from "@/services/auth.service";
+import GuestRoute from "@/components/auth/GuestRoute";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,13 +20,17 @@ import {
 } from "@/components/ui/card";
 import { Bookmark, Eye, EyeOff, AtSign } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
-export default function SignupPage() {
+function SignupForm() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(signupSchema),
@@ -34,8 +41,40 @@ export default function SignupPage() {
     },
   });
 
-  function onSubmit(data) {
-    console.log(data);
+  async function onSubmit(data) {
+    try {
+      setAuthError("");
+      console.log(data);
+
+      // 1. Check handle uniqueness before signup
+      const exists = await checkHandleExists(data.handle);
+      if (exists) {
+        setError("handle", { message: "This handle is already taken" });
+        return;
+      }
+
+      // 2. Sign up + create profile (trigger creates profile row)
+      const result = await signUp({
+        email: data.email,
+        password: data.password,
+        handle: data.handle,
+      });
+
+      // 3. Redirect based on whether a session was returned
+      if (result.session) {
+        // Email confirmation is OFF → user is signed in immediately
+        toast.success("Account created successfully!");
+        router.replace("/dashboard");
+      } else {
+        // Email confirmation is ON → user must verify email first
+        toast.success("Account created! Please check your email to confirm, then log in.");
+        router.replace("/login");
+      }
+    } catch (err) {
+      const msg = err?.message || "Failed to create account";
+      setAuthError(msg);
+      toast.error(msg);
+    }
   }
 
   return (
@@ -69,6 +108,13 @@ export default function SignupPage() {
 
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" id="signup-form">
+              {/* Auth-level error */}
+              {authError && (
+                <div className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive" id="signup-auth-error">
+                  {authError}
+                </div>
+              )}
+
               {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="signup-email">Email</Label>
@@ -99,7 +145,7 @@ export default function SignupPage() {
                     type="text"
                     placeholder="yourhandle"
                     autoComplete="username"
-                    className="pl-8"
+                    className="pl-8 lowercase"
                     {...register("handle")}
                     aria-invalid={!!errors.handle}
                   />
@@ -110,7 +156,7 @@ export default function SignupPage() {
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    This will be your public profile URL
+                    This will be your public profile URL (lowercase, 3-30 chars)
                   </p>
                 )}
               </div>
@@ -177,5 +223,13 @@ export default function SignupPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <GuestRoute>
+      <SignupForm />
+    </GuestRoute>
   );
 }
