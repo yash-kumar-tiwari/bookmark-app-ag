@@ -121,6 +121,34 @@ create trigger bookmarks_set_updated_at
   execute function public.handle_updated_at();
 
 -- ────────────────────────────────────────────────────────────
+-- 4b. Auto-create profile on signup
+--     Reads handle + email from auth.users.raw_user_meta_data
+--     which is set via supabase.auth.signUp({ options: { data } })
+-- ────────────────────────────────────────────────────────────
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.profiles (id, email, handle)
+  values (
+    new.id,
+    new.email,
+    lower(trim(new.raw_user_meta_data ->> 'handle'))
+  );
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row
+  execute function public.handle_new_user();
+
+-- ────────────────────────────────────────────────────────────
 -- 5. Row Level Security
 -- ────────────────────────────────────────────────────────────
 
@@ -137,6 +165,13 @@ create policy "Profiles are publicly readable"
   for select
   to anon, authenticated
   using (true);
+
+-- Users can insert their own profile (signup flow)
+create policy "Users can insert own profile"
+  on public.profiles
+  for insert
+  to authenticated
+  with check (auth.uid() = id);
 
 -- Users can update only their own profile
 create policy "Users can update own profile"
