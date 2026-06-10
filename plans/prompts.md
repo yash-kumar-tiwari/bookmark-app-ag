@@ -165,4 +165,40 @@ A chronological record of all prompts used to build this application. Each entry
 
 ---
 
+## Prompt 5 — Bookmark CRUD (Supabase)
+
+**Date:** 2026-06-10  
+**Phase:** Bookmark implementation
+
+**Prompt:**
+
+> Implement bookmark CRUD. Authentication already works. Database already exists.
+>
+> Stack: Next.js 16, JavaScript, Supabase. CSR only.
+>
+> Create: `src/services/bookmark.service.js`
+>
+> Functions: getBookmarks, createBookmark, updateBookmark, deleteBookmark
+>
+> Dashboard: list, add, edit, delete. Use existing forms. Never filter security on frontend — trust RLS.
+> Show loading and error states. Refresh UI after mutations.
+
+**What was produced:**
+
+- `src/services/bookmark.service.js` — 4 CRUD functions using Supabase client, all rely on RLS
+- `src/app/dashboard/page.js` — Replaced mock data with real Supabase queries:
+  - Loading spinner while fetching
+  - Error state with retry button
+  - Async CRUD handlers that refetch after mutations
+  - Dialogs show spinners during async operations
+  - Removed `mockBookmarks` import
+
+**Key decisions:**
+- `getBookmarks()` does not filter by user_id — RLS handles it
+- `createBookmark()` gets user.id from `supabase.auth.getUser()` since `user_id` FK is required
+- After every mutation, `fetchBookmarks()` is called to refresh the full list from the server
+- Dialog submit handlers re-throw errors so the dialog stays open on failure
+
+---
+
 *— End of log. Append new prompts below as development continues. —*

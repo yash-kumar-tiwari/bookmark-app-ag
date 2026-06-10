@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { bookmarkSchema } from "@/lib/schemas";
-import { mockBookmarks } from "@/lib/mock-data";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/services/auth.service";
+import {
+  getBookmarks,
+  createBookmark,
+  updateBookmark,
+  deleteBookmark,
+} from "@/services/bookmark.service";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Link from "next/link";
 
@@ -20,9 +25,6 @@ import { Separator } from "@/components/ui/separator";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Dialog,
@@ -31,7 +33,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -43,7 +44,6 @@ import {
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -58,6 +58,8 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -74,16 +76,18 @@ function AddBookmarkDialog({ open, onOpenChange, onAdd }) {
     defaultValues: { title: "", url: "", is_public: false },
   });
 
-  function onSubmit(data) {
-    console.log(data);
-    onAdd(data);
-    reset();
-    onOpenChange(false);
-    toast.success("Bookmark added successfully");
+  async function onSubmit(data) {
+    try {
+      await onAdd(data);
+      reset();
+      onOpenChange(false);
+    } catch {
+      // error handled by parent
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Add bookmark</DialogTitle>
@@ -151,7 +155,14 @@ function AddBookmarkDialog({ open, onOpenChange, onAdd }) {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} id="add-bookmark-submit">
-              {isSubmitting ? "Adding…" : "Add bookmark"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Adding…
+                </>
+              ) : (
+                "Add bookmark"
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -176,11 +187,13 @@ function EditBookmarkDialog({ open, onOpenChange, bookmark, onEdit }) {
     },
   });
 
-  function onSubmit(data) {
-    console.log(data);
-    onEdit({ ...bookmark, ...data });
-    onOpenChange(false);
-    toast.success("Bookmark updated");
+  async function onSubmit(data) {
+    try {
+      await onEdit(bookmark.id, data);
+      onOpenChange(false);
+    } catch {
+      // error handled by parent
+    }
   }
 
   return (
@@ -252,7 +265,14 @@ function EditBookmarkDialog({ open, onOpenChange, bookmark, onEdit }) {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} id="edit-bookmark-submit">
-              {isSubmitting ? "Saving…" : "Save changes"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save changes"
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -263,6 +283,20 @@ function EditBookmarkDialog({ open, onOpenChange, bookmark, onEdit }) {
 
 // ── Delete Confirmation Dialog ───────────────────────────────────────────
 function DeleteBookmarkDialog({ open, onOpenChange, bookmark, onDelete }) {
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleConfirm() {
+    try {
+      setDeleting(true);
+      await onDelete(bookmark.id);
+      onOpenChange(false);
+    } catch {
+      // error handled by parent
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -280,19 +314,24 @@ function DeleteBookmarkDialog({ open, onOpenChange, bookmark, onDelete }) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel id="delete-cancel">Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogCancel disabled={deleting} id="delete-cancel">
+            Cancel
+          </AlertDialogCancel>
+          <Button
             variant="destructive"
+            disabled={deleting}
+            onClick={handleConfirm}
             id="delete-confirm"
-            onClick={() => {
-              console.log("Delete:", bookmark);
-              onDelete(bookmark.id);
-              onOpenChange(false);
-              toast.success("Bookmark deleted");
-            }}
           >
-            Delete
-          </AlertDialogAction>
+            {deleting ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                Deleting…
+              </>
+            ) : (
+              "Delete"
+            )}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -311,12 +350,10 @@ function BookmarkRow({ bookmark, onEdit, onDelete }) {
 
   return (
     <div className="group flex items-center gap-4 rounded-xl px-4 py-3 transition-colors hover:bg-muted/50">
-      {/* Favicon placeholder */}
       <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
         <Bookmark className="size-4" />
       </div>
 
-      {/* Info */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-medium">{bookmark.title}</p>
@@ -335,7 +372,6 @@ function BookmarkRow({ bookmark, onEdit, onDelete }) {
         <p className="truncate text-xs text-muted-foreground">{domain}</p>
       </div>
 
-      {/* Actions */}
       <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <Button
           variant="ghost"
@@ -379,38 +415,79 @@ function BookmarkRow({ bookmark, onEdit, onDelete }) {
 function DashboardContent() {
   const router = useRouter();
   const { profile } = useAuth();
-  const [bookmarks, setBookmarks] = useState(mockBookmarks);
+
+  // Bookmark state
+  const [bookmarks, setBookmarks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Dialog state
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedBookmark, setSelectedBookmark] = useState(null);
+
+  // UI state
   const [copied, setCopied] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const publicCount = bookmarks.filter((b) => b.is_public).length;
   const privateCount = bookmarks.filter((b) => !b.is_public).length;
 
-  // Use real profile data, fallback for safety
   const handle = profile?.handle ?? "user";
   const email = profile?.email ?? "";
 
-  function handleAdd(data) {
-    const newBookmark = {
-      ...data,
-      id: String(Date.now()),
-      created_at: new Date().toISOString(),
-    };
-    setBookmarks((prev) => [newBookmark, ...prev]);
+  // ── Fetch bookmarks ──────────────────────────────────────────────────
+  const fetchBookmarks = useCallback(async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      const data = await getBookmarks();
+      setBookmarks(data);
+    } catch (err) {
+      console.error("Failed to load bookmarks:", err);
+      setError(err?.message || "Failed to load bookmarks");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBookmarks();
+  }, [fetchBookmarks]);
+
+  // ── CRUD handlers ────────────────────────────────────────────────────
+  async function handleAdd(data) {
+    try {
+      await createBookmark(data);
+      toast.success("Bookmark added");
+      await fetchBookmarks();
+    } catch (err) {
+      toast.error(err?.message || "Failed to add bookmark");
+      throw err; // re-throw so dialog knows it failed
+    }
   }
 
-  function handleEdit(updated) {
-    setBookmarks((prev) =>
-      prev.map((b) => (b.id === updated.id ? updated : b))
-    );
+  async function handleEdit(id, data) {
+    try {
+      await updateBookmark(id, data);
+      toast.success("Bookmark updated");
+      await fetchBookmarks();
+    } catch (err) {
+      toast.error(err?.message || "Failed to update bookmark");
+      throw err;
+    }
   }
 
-  function handleDelete(id) {
-    setBookmarks((prev) => prev.filter((b) => b.id !== id));
+  async function handleDelete(id) {
+    try {
+      await deleteBookmark(id);
+      toast.success("Bookmark deleted");
+      await fetchBookmarks();
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete bookmark");
+      throw err;
+    }
   }
 
   function handleCopyProfileLink() {
@@ -436,6 +513,7 @@ function DashboardContent() {
     }
   }
 
+  // ── Render ───────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Top bar */}
@@ -551,7 +629,34 @@ function DashboardContent() {
             {/* List */}
             <Card className="border-border/60">
               <CardContent className="p-2">
-                {bookmarks.length === 0 ? (
+                {/* Loading state */}
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Loader2 className="mb-3 size-6 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">
+                      Loading bookmarks…
+                    </p>
+                  </div>
+                ) : error ? (
+                  /* Error state */
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-destructive/10">
+                      <AlertTriangle className="size-6 text-destructive" />
+                    </div>
+                    <h3 className="font-semibold">Failed to load bookmarks</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+                    <Button
+                      variant="outline"
+                      className="mt-4 gap-2"
+                      onClick={fetchBookmarks}
+                      id="retry-fetch"
+                    >
+                      <RefreshCw className="size-3.5" />
+                      Try again
+                    </Button>
+                  </div>
+                ) : bookmarks.length === 0 ? (
+                  /* Empty state */
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-muted">
                       <Bookmark className="size-6 text-muted-foreground" />
@@ -570,6 +675,7 @@ function DashboardContent() {
                     </Button>
                   </div>
                 ) : (
+                  /* Bookmark list */
                   <div className="divide-y divide-border/60">
                     {bookmarks.map((bookmark) => (
                       <BookmarkRow
