@@ -201,4 +201,33 @@ A chronological record of all prompts used to build this application. Each entry
 
 ---
 
+## Prompt 6 — Public Profile Route (Supabase)
+
+**Date:** 2026-06-10  
+**Phase:** Public profile
+
+**Prompt:**
+
+> Implement public profile route `/[handle]`. Accessible without login.
+>
+> Fetch profile by handle, fetch public bookmarks only (is_public = true).
+> Display handle and public bookmarks. Never expose private bookmarks.
+>
+> Create: `src/services/profile.service.js`
+> Reuse existing bookmark cards. Show profile not found state.
+
+**What was produced:**
+
+- `src/services/profile.service.js` — `getProfileByHandle(handle)` + `getPublicBookmarks(userId)`
+- `src/app/[handle]/page.js` — Rewrote as single CSR page with 4 states: loading, error, not found, profile view
+- Deleted `src/app/[handle]/public-profile-client.jsx` (merged into page.js)
+
+**Key decisions:**
+- `getPublicBookmarks()` explicitly filters `is_public = true` as belt-and-suspenders with RLS
+- Removed `generateStaticParams` and `generateMetadata` — page is now fully CSR (no server component)
+- Profile fetched by handle, then public bookmarks fetched by the profile's user id
+- `maybeSingle()` used for profile lookup so null = not found (no error thrown)
+
+---
+
 *— End of log. Append new prompts below as development continues. —*
