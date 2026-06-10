@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
+import { getTransporter } from "@/lib/mailer";
 
 export async function POST(request) {
   try {
@@ -12,21 +12,21 @@ export async function POST(request) {
       );
     }
 
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      console.warn("RESEND_API_KEY is not configured. Email not sent.");
+    const transporter = getTransporter();
+    if (!transporter) {
+      console.warn("SMTP Transporter is not configured. Email not sent.");
       return NextResponse.json(
-        { success: false, message: "Resend API key not configured" },
+        { success: false, message: "SMTP configuration is missing or incomplete" },
         { status: 500 }
       );
     }
 
-    const resend = new Resend(apiKey);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const dashboardLink = `${appUrl}/dashboard`;
+    const fromUser = process.env.SMTP_USER;
 
-    const data = await resend.emails.send({
-      from: "Bookmarks <onboarding@resend.dev>",
+    const info = await transporter.sendMail({
+      from: `"Bookmarks" <${fromUser}>`,
       to: email,
       subject: "Welcome to Bookmarks",
       html: `
@@ -46,15 +46,11 @@ export async function POST(request) {
       `,
     });
 
-    console.log(data, "data from send welcome api route");
+    console.log("Email sent successfully via Nodemailer, messageId:", info.messageId);
 
-    if (data.error) {
-      throw new Error(data.error.message);
-    }
-
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, messageId: info.messageId });
   } catch (error) {
-    console.error("Error sending welcome email via Resend:", error);
+    console.error("Error sending welcome email via Nodemailer:", error);
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 500 }

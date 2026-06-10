@@ -325,6 +325,43 @@ A chronological record of all prompts used to build this application. Each entry
 
 ---
 
+## Prompt 9 — Nodemailer Transition
+
+**Date:** 2026-06-10  
+**Phase:** Mailer modernization
+
+**Prompt:**
+
+> Replace the current Resend implementation with Nodemailer using Gmail SMTP while keeping the existing functionality and API contract unchanged.
+> 
+> Requirements:
+> - Use JavaScript only.
+> - Keep the same API route path and request/response structure.
+> - Keep the same email template, subject, and behavior.
+> - Keep the existing JSON response format (success: true + messageId, or success: false + message).
+> - Do not change frontend code that calls this API.
+> - Create a reusable mailer utility: `src/lib/mailer.js` (Singleton transporter pattern).
+> - Configure SMTP using environment variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`).
+> - Use Gmail App Password authentication.
+> - Replace all Resend-specific code with Nodemailer.
+> - Keep the existing HTML email template exactly the same unless required for compatibility.
+> - Use: `from: "Bookmarks" <${process.env.SMTP_USER}>`
+> - Remove all unused Resend imports, configuration, and dependencies.
+
+**What was produced:**
+
+- `src/lib/mailer.js` — Created a reusable SMTP mailer utility using the Singleton transporter pattern and Nodemailer.
+- `src/app/api/send-welcome/route.js` — Replaced Resend calls with Nodemailer `sendMail`, matching the exact subject, HTML content, and response JSON structure.
+- `.env.example` — Replaced `RESEND_API_KEY` with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASS`.
+- `package.json` — Removed the unused `resend` dependency.
+
+**Key decisions:**
+- SMTP port parsed as a Number to meet Nodemailer's type checks.
+- Added connection safety checks inside `getTransporter()` to warn if credentials are not present, allowing the client-side signup flow to degrade gracefully without blocking user creation.
+
+---
+
 *— End of log. Append new prompts below as development continues. —*
+
 
 
