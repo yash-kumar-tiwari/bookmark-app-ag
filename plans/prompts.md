@@ -113,4 +113,56 @@ A chronological record of all prompts used to build this application. Each entry
 
 ---
 
+## Prompt 4 — Authentication (Supabase Auth)
+
+**Date:** 2026-06-10  
+**Phase:** Authentication
+
+**Prompt:**
+
+> Implement ONLY authentication. Database already exists.
+>
+> Stack: Next.js 16, JavaScript, Supabase Auth. CSR only.
+>
+> Do NOT use: middleware, API routes, server actions
+>
+> Create:
+> - `src/lib/supabase.js`
+> - `src/services/auth.service.js`
+> - `src/hooks/useAuth.js`
+> - `src/components/auth/ProtectedRoute.jsx`
+> - `src/components/auth/GuestRoute.jsx`
+>
+> Signup flow: check handle exists → sign up user → create profile row → redirect /dashboard  
+> Login: signInWithPassword → redirect /dashboard  
+> Logout: signOut → redirect /login
+>
+> Dashboard: ProtectedRoute required.  
+> Login/Signup: GuestRoute required.
+>
+> Handle: unique, lowercase, url friendly. Use RHF + Zod.
+>
+> Output complete code only. Do not implement bookmarks.
+
+**What was produced:**
+
+- `src/lib/supabase.js` — Browser-only Supabase client with env var validation
+- `src/services/auth.service.js` — Auth service (checkHandleExists, signUp, signIn, signOut)
+- `src/hooks/useAuth.js` — AuthContext + AuthProvider + useAuth hook (getSession, onAuthStateChange, profile fetch)
+- `src/components/auth/ProtectedRoute.jsx` — Redirects to /login if unauthenticated, branded spinner
+- `src/components/auth/GuestRoute.jsx` — Redirects to /dashboard if authenticated, branded spinner
+- `src/app/layout.js` — Added AuthProvider wrapper
+- `src/app/login/page.js` — Wrapped in GuestRoute, real signIn call, auth error banner
+- `src/app/signup/page.js` — Wrapped in GuestRoute, 3-step signup flow, handle uniqueness check
+- `src/app/dashboard/page.js` — Wrapped in ProtectedRoute, real user data from useAuth, real signOut
+- `.env.example` — Environment variable template
+
+**Key decisions:**
+- Handle normalized to lowercase in auth.service (not in Zod schema) to keep validation separate from transformation
+- AuthProvider placed in root layout so all pages have access
+- Profile is fetched once on auth state change, not on every render
+- Bookmark CRUD left as mock data (not implemented per requirement)
+
+---
+
 *— End of log. Append new prompts below as development continues. —*
