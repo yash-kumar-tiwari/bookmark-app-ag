@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signupSchema } from "@/lib/schemas";
 import { signUp, checkHandleExists } from "@/services/auth.service";
+import { sendWelcomeEmail } from "@/services/email.service";
 import GuestRoute from "@/components/auth/GuestRoute";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,16 @@ function SignupForm() {
         password: data.password,
         handle: data.handle,
       });
+
+      // Send welcome email (failures are handled gracefully and won't block signup/redirection)
+      try {
+        await sendWelcomeEmail({
+          email: data.email,
+          handle: data.handle,
+        });
+      } catch (err) {
+        console.error("Welcome email failed to send, proceeding with signup:", err);
+      }
 
       // 3. Redirect based on whether a session was returned
       if (result.session) {

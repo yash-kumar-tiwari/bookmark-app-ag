@@ -230,4 +230,58 @@ A chronological record of all prompts used to build this application. Each entry
 
 ---
 
+## Prompt 7 — Welcome Email Integration (Resend)
+
+**Date:** 2026-06-10  
+**Phase:** Email notification integration
+
+**Prompt:**
+
+> Authentication already works.
+> 
+> Implement welcome email.
+> 
+> Use: Resend
+> 
+> Create: src/services/email.service.js
+> 
+> Create: .env.example
+> 
+> ```env
+> NEXT_PUBLIC_SUPABASE_URL=
+> NEXT_PUBLIC_SUPABASE_ANON_KEY=
+> SUPABASE_SERVICE_ROLE_KEY=
+> RESEND_API_KEY=
+> NEXT_PUBLIC_APP_URL=
+> ```
+> 
+> After successful signup: Send email.
+> 
+> Subject: Welcome to Bookmarks
+> 
+> Email contains:
+> - greeting
+> - user handle
+> - dashboard link
+> 
+> Handle failures gracefully. Do not block signup if email fails.
+> 
+> Provide: Resend setup, Supabase setup, Vercel deployment steps
+> 
+> Output complete code only.
+
+**What was produced:**
+
+- `src/services/email.service.js` — Client-side service wrapper that invokes our server API.
+- `src/app/api/send-welcome/route.js` — Server-side Next.js API route to securely handle the Resend API call without key exposure.
+- `src/app/signup/page.js` — Integrated `sendWelcomeEmail` call inside the form submission after successful signup, catching errors gracefully.
+- `.env.example` — Configuration template containing the five required environment variables.
+
+**Key decisions:**
+- Created a Next.js Route Handler for server-side execution because `RESEND_API_KEY` is a secret key and must not be exposed to the client browser.
+- Wrapped the API request client-side and server-side in try/catch blocks so any errors (such as missing/expired keys or network failure) are logged to the console instead of throwing errors that block signup.
+
+---
+
 *— End of log. Append new prompts below as development continues. —*
+
